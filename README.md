@@ -2,7 +2,7 @@
 
 Ollama Commander is a colorful terminal UI for chatting with and managing local Ollama models from one place. It gives you a dashboard for installed models, quick model actions, and a chat mode with an attachable local knowledge base.
 
-![Ollama Commander dashboard](assets/screenshots/dashboard.png)
+![Ollama Commander dashboard](assets/screenshots/dashboard-main.png)
 
 ## Why It Exists
 
@@ -21,11 +21,25 @@ Ollama is great at serving local models, but day-to-day usage often means juggli
 - Model actions for pull, inspect, stop, delete, duplicate, and refresh
 - No external Python dependencies
 
-## Screenshot
+## Screenshots
 
-- Main dashboard: installed models, live memory, and command launcher
+### Main Dashboard
 
-  ![Dashboard view](assets/screenshots/dashboard.png)
+Installed models, live memory, and the command launcher in one view.
+
+![Dashboard view](assets/screenshots/dashboard-main.png)
+
+### Model Inspection
+
+Inspect a model's family, parameters, quantization, and prompt template without leaving the terminal.
+
+![Inspect model view](assets/screenshots/inspect-model.png)
+
+### Knowledge Base
+
+Attach local files, keep them across restarts, and manage your session context from the built-in knowledge-base panel.
+
+![Knowledge base view](assets/screenshots/knowledge-base.png)
 
 ## Requirements
 
@@ -92,7 +106,9 @@ python .\ollama_cli.py
 ├── run-commander.bat
 ├── assets/
 │   └── screenshots/
-│       └── dashboard.png
+│       ├── dashboard-main.png
+│       ├── inspect-model.png
+│       └── knowledge-base.png
 └── README.md
 ```
 
@@ -108,4 +124,3 @@ python .\ollama_cli.py
 - Richer chat transcript rendering
 - Better retrieval across multiple large files
 - Exportable chat sessions
-
