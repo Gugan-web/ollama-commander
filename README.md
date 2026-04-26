@@ -1,5 +1,9 @@
 # Ollama Commander
 
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
+[![Ollama](https://img.shields.io/badge/Ollama-Local%20LLM%20Runtime-black.svg)](https://ollama.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
 Ollama Commander is a terminal-first interface for working with local [Ollama](https://ollama.com/) models. It combines model management, interactive chat, and a lightweight file-backed knowledge base in a single keyboard-driven workflow.
 
 ![Ollama Commander dashboard](assets/screenshots/01-dashboard-pull.png)
