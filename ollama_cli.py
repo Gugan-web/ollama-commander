@@ -38,6 +38,8 @@ class Style:
     FG = {
         "white": "\033[97m",
         "silver": "\033[37m",
+        "soft": "\033[38;5;250m",
+        "muted": "\033[38;5;244m",
         "red": "\033[91m",
         "orange": "\033[38;5;214m",
         "yellow": "\033[93m",
@@ -51,6 +53,7 @@ class Style:
     }
 
     BG = {
+        "slate": "\033[48;5;238m",
         "indigo": "\033[48;5;54m",
         "blue": "\033[48;5;25m",
         "cyan": "\033[48;5;31m",
@@ -684,73 +687,106 @@ class OllamaCommander:
             sections.append(excerpt)
         return "\n\n".join(sections)
 
-    def render_chat_columns(self, history: list[dict], model: str) -> str:
-        width = min(max(terminal_width() - 4, 80), 140)
-        column_width = max((width - 3) // 2, 28)
-        divider = color(" │ ", Style.FG["magenta"])
+    def chat_icon(self) -> str:
+        encoding = (getattr(sys.stdout, "encoding", "") or "").lower()
+        return "◦" if "utf" in encoding else "*"
+
+    def render_chat_bubble(self, text: str, width: int) -> list[str]:
+        bubble_limit = max(min(width // 2, 40), 18)
+        paragraphs = text.splitlines() or [text]
+        wrapped_lines: list[str] = []
+        for paragraph in paragraphs:
+            wrapped = textwrap.wrap(
+                paragraph,
+                width=bubble_limit,
+                replace_whitespace=False,
+                drop_whitespace=True,
+            ) or [""]
+            wrapped_lines.extend(wrapped)
+
+        inner_width = max((max((len(line) for line in wrapped_lines), default=0) + 2), 6)
         rows = []
+        for line in wrapped_lines:
+            bubble = color(
+                f" {line.ljust(inner_width - 2)} ",
+                Style.BOLD,
+                Style.FG["white"],
+                Style.BG["slate"],
+            )
+            left_padding = max(width - visible_len(bubble), 0)
+            rows.append((" " * left_padding) + bubble)
+        return rows
 
-        header_left = pad_visible(color(" You ", Style.BOLD, Style.FG["yellow"]), column_width)
-        header_right = pad_visible(color(f" {model} ", Style.BOLD, Style.FG["cyan"]), column_width)
-        rows.append(header_left + divider + header_right)
-        rows.append(
-            color("─" * column_width, Style.FG["yellow"])
-            + divider
-            + color("─" * column_width, Style.FG["cyan"])
-        )
+    def render_assistant_message(self, text: str, width: int) -> list[str]:
+        content_width = max(min(width - 6, 90), 36)
+        rows = []
+        paragraphs = text.splitlines() or [text]
+        for index, paragraph in enumerate(paragraphs):
+            wrapped = textwrap.wrap(
+                paragraph,
+                width=content_width,
+                replace_whitespace=False,
+                drop_whitespace=True,
+            ) or [""]
+            for line in wrapped:
+                rows.append(color(line, Style.FG["white"]))
+            if index != len(paragraphs) - 1:
+                rows.append("")
+        return rows
 
-        for message in history[-10:]:
+    def render_chat_screen_lines(self, model: str, history: list[dict]) -> list[str]:
+        width = min(max(terminal_width() - 6, 50), 110)
+        rows = [
+            color(f"{model}", Style.BOLD, Style.FG["soft"]),
+            color(
+                f"{len(self.knowledge_files)} file(s) attached  •  /files  /clear  /exit",
+                Style.FG["muted"],
+            ),
+            "",
+        ]
+
+        if not history:
+            rows.extend(
+                [
+                    color("Start the conversation.", Style.FG["muted"]),
+                    "",
+                ]
+            )
+            return rows
+
+        for message in history[-8:]:
             role = message.get("role", "")
             content = message.get("content", "").strip() or "(empty)"
-            wrapped = textwrap.wrap(content, width=max(column_width - 2, 10)) or [""]
-            for idx, line in enumerate(wrapped):
-                if role == "user":
-                    left = pad_visible(color(line, Style.FG["white"]), column_width)
-                    right = " " * column_width
-                elif role == "assistant":
-                    left = " " * column_width
-                    right = pad_visible(color(line, Style.FG["silver"]), column_width)
-                else:
-                    text = color(line if idx == 0 else line, Style.FG["orange"])
-                    left = pad_visible(text, column_width)
-                    right = " " * column_width
-                rows.append(left + divider + right)
-            rows.append((" " * column_width) + divider + (" " * column_width))
+            if role == "user":
+                rows.extend(self.render_chat_bubble(content, width))
+                rows.append("")
+                continue
 
-        return "\n".join(rows)
+            if role == "assistant":
+                thought_seconds = message.get("thought_seconds")
+                if thought_seconds is not None:
+                    icon = self.chat_icon()
+                    rows.append(
+                        color(
+                            f"{icon}  Thought for {thought_seconds:.1f} seconds",
+                            Style.FG["muted"],
+                        )
+                    )
+                    rows.append("")
+                rows.extend(self.render_assistant_message(content, width))
+                rows.append("")
+                continue
+
+            rows.append(color(content, Style.FG["orange"]))
+            rows.append("")
+
+        return rows
 
     def print_chat_screen(self, model: str, history: list[dict]) -> None:
         clear()
-        print(self.render_banner())
         print()
-
-        knowledge_lines = [
-            color(f"Model: {model}", Style.FG["lime"], Style.BOLD),
-            f"Knowledge files: {len(self.knowledge_files)} attached",
-            "Large files are indexed by path and sampled into context per prompt.",
-            "Commands: /files manage files, /clear reset chat, /exit return to dashboard.",
-        ]
-        if self.knowledge_files:
-            preview = ", ".join(item.path.name for item in self.knowledge_files[:4])
-            if len(self.knowledge_files) > 4:
-                preview += f" ... +{len(self.knowledge_files) - 4} more"
-            knowledge_lines.append(f"Attached: {preview}")
-
-        print(panel("Chat Mode", knowledge_lines, Style.FG["green"]))
-        print()
-        if history:
-            print(panel("Conversation", self.render_chat_columns(history, model).splitlines(), Style.FG["magenta"]))
-        else:
-            print(
-                panel(
-                    "Conversation",
-                    [
-                        "Your prompts will appear on the left.",
-                        f"{model} responses will appear on the right.",
-                    ],
-                    Style.FG["magenta"],
-                )
-            )
+        for line in self.render_chat_screen_lines(model, history):
+            print("  " + line if line else "")
 
     def manage_knowledge_files(self) -> None:
         while True:
@@ -899,7 +935,7 @@ class OllamaCommander:
         while True:
             self.print_chat_screen(selected, history)
             try:
-                user_text = input(color("\nPrompt ", Style.BOLD, Style.FG["yellow"]))
+                user_text = input(color("\n  › ", Style.BOLD, Style.FG["soft"]))
             except EOFError:
                 return
             user_text = user_text.strip()
@@ -923,6 +959,7 @@ class OllamaCommander:
             request_messages.extend(history)
             parts = []
             try:
+                started_at = time.time()
                 response = self.client.stream_chat(selected, request_messages)
                 for raw in response:
                     if not raw:
@@ -936,7 +973,13 @@ class OllamaCommander:
                         parts.append(content)
                     if payload.get("done"):
                         break
-                history.append({"role": "assistant", "content": "".join(parts)})
+                history.append(
+                    {
+                        "role": "assistant",
+                        "content": "".join(parts),
+                        "thought_seconds": time.time() - started_at,
+                    }
+                )
             except Exception as exc:
                 print(color(f"Chat failed: {exc}", Style.FG["red"], Style.BOLD))
                 self.pause()
