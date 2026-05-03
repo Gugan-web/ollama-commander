@@ -244,12 +244,16 @@ class OllamaClient:
             method=method,
         )
         try:
-            response = urllib.request.urlopen(request, timeout=20)
+            response = urllib.request.urlopen(request)
             return response if stream else json.load(response)
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")
             raise RuntimeError(f"Ollama API error {exc.code}: {detail}") from exc
+        except TimeoutError as exc:
+            raise RuntimeError("Request to Ollama timed out. The model might be loading or processing a large input.") from exc
         except urllib.error.URLError as exc:
+            if isinstance(exc.reason, TimeoutError) or (hasattr(exc.reason, "args") and "timed out" in str(exc.reason).lower()):
+                raise RuntimeError("Request to Ollama timed out. The model might be loading or processing a large input.") from exc
             raise RuntimeError(
                 f"Could not connect to Ollama at {self.base_url}. Start Ollama first."
             ) from exc
